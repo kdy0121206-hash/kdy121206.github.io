@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <style>
+    body { 
+      margin: 0; overflow: hidden; background-color: #87CEEB; font-family: sans-serif;
+      touch-action: none; user-select: none; -webkit-user-select: none;
+    }
+    #look-area { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+    #crosshair {
+      position: absolute; top: 50%; left: 50%; width: 20px; height: 20px; margin-top: -10px; margin-left: -10px;
+      color: white; font-size: 24px; text-align: center; line-height: 20px; pointer-events: none; z-index: 5; text-shadow: 1px 1px 2px black;
+    }
+    #ui-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+    
+    #top-bar { position: absolute; top: 20px; left: 0; width: 100%; text-align: center; pointer-events: none; }
+    #instructions { display: inline-block; padding: 5px 15px; background-color: rgba(0,0,0,0.5); color: white; border-radius: 20px; text-shadow: 1px 1px 2px black; font-size: 13px; }
+
+    #progress-container {
+      display: none;
+      width: 150px; height: 12px; margin: 10px auto 0 auto;
+      background-color: rgba(0,0,0,0.6);
+      border: 2px solid white; border-radius: 6px;
+      overflow: hidden; pointer-events: none;
+    }
+    #progress-bar {
+      width: 0%; height: 100%; background-color: #4CAF50;
+    }
+
+    #hotbar-container {
+      position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+      display: flex; gap: 10px; align-items: center; pointer-events: auto;
+    }
+    #hotbar {
+      display: flex; gap: 5px; background-color: rgba(0,0,0,0.5); padding: 5px; border-radius: 5px;
+    }
+    .slot { 
+      width: 40px; height: 40px; border: 2px solid #555; border-radius: 5px; box-sizing: border-box; cursor: pointer; 
+      background-size: cover; image-rendering: pixelated; 
+    }
+    .slot.active { border: 3px solid white; transform: scale(1.1); }
+    
+    #btn-inventory {
+      width: 40px; height: 40px; background-color: rgba(0,0,0,0.6); color: white;
+      border: 2px solid #aaa; border-radius: 5px; font-weight: bold; text-align: center;
+      line-height: 36px; cursor: pointer; box-sizing: border-box; font-size: 18px;
+    }
+    #btn-inventory:active { background-color: rgba(255,255,255,0.3); }
+
+    #inventory-modal {
+      display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      width: 320px; background-color: rgba(0,0,0,0.85); border: 3px solid #555; border-radius: 10px;
+      padding: 15px; pointer-events: auto; z-index: 100; color: white; text-align: center;
+    }
+    #inventory-grid {
+      display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 15px 0;
+    }
+    #btn-close-inv {
+      padding: 8px 25px; background-color: #e74c3c; border: 2px solid white; border-radius: 5px; color: white;
+      font-weight: bold; cursor: pointer; font-size: 14px;
+    }
+    #btn-close-inv:active { background-color: #c0392b; }
+
+    .d-pad { position: absolute; bottom: 80px; left: 40px; width: 120px; height: 120px; pointer-events: auto; }
+    .btn { position: absolute; width: 40px; height: 40px; background-color: rgba(255, 255, 255, 0.5); border-radius: 10px; text-align: center; line-height: 40px; font-weight: bold; color: #333; }
+    .btn:active { background-color: rgba(255, 255, 255, 0.8); }
+    #btn-w { top: 0; left: 40px; } #btn-s { bottom: 0; left: 40px; } #btn-a { top: 40px; left: 0; } #btn-d { top: 40px; right: 0; }
+
+    #btn-run {
+      position: absolute; bottom: 220px; left: 40px; width: 60px; height: 60px; border-radius: 30px; background-color: rgba(255, 255, 255, 0.5); text-align: center; line-height: 60px; font-weight: bold; pointer-events: auto;
+    }
+    #btn-run:active { background-color: rgba(255, 255, 255, 0.8); }
+    #btn-run.running { background-color: rgba(0, 255, 127, 0.8); color: #000; }
+
+    #btn-jump {
+      position: absolute; bottom: 150px; right: 40px; width: 60px; height: 60px; border-radius: 30px; background-color: rgba(255, 255, 255, 0.5); text-align: center; line-height: 60px; font-weight: bold; pointer-events: auto;
+    }
+    #btn-jump:active { background-color: rgba(255, 255, 255, 0.8); }
+    #btn-jump.flying { background-color: rgba(255, 215, 0, 0.8); color: #000; }
+
+    #btn-descend {
+      position: absolute; bottom: 80px; right: 40px; width: 60px; height: 60px; border-radius: 30px; background-color: rgba(255, 255, 255, 0.5); text-align: center; line-height: 60px; font-weight: bold; pointer-events: auto; display: none;
+    }
+    #btn-descend:active { background-color: rgba(255, 255, 255, 0.8); }
+  </style>
+</head>
+<body>
+  <div id="look-area"></div>
+  <div id="crosshair">+</div>
+  
+  <div id="ui-container">
+    <div id="top-bar">
+      <div id="instructions">설치/파괴 🧱 | JUMP 2회: 비행 🕊️ | RUN: 달리기 🏃</div>
+      <div id="progress-container"><div id="progress-bar"></div></div>
+    </div>
+
+    <div id="hotbar-container">
+      <div id="hotbar">
+        <div id="slot-0" class="slot active" data-index="0"></div>
+        <div id="slot-1" class="slot" data-index="1"></div>
+        <div id="slot-2" class="slot" data-index="2"></div>
+        <div id="slot-3" class="slot" data-index="3"></div>
+        <div id="slot-4" class="slot" data-index="4"></div>
+      </div>
+      <div id="btn-inventory">•••</div>
+    </div>
+
+    <div id="inventory-modal">
+      <div style="font-size:18px; margin-bottom:5px; font-weight:bold;">블록 인벤토리 🎒</div>
+      <div style="font-size:12px; color:#ddd;">인벤토리에서 블록을 터치하면 현재 핫바에 장착됩니다.</div>
+      <div id="inventory-grid"></div>
+      <button id="btn-close-inv">닫기</button>
+    </div>
+
+    <div id="btn-run">RUN</div>
+
+    <div class="d-pad">
+      <div id="btn-w" class="btn">W</div><div id="btn-a" class="btn">A</div>
+      <div id="btn-s" class="btn">S</div><div id="btn-d" class="btn">D</div>
+    </div>
+    
+    <div id="btn-jump">JUMP</div>
+    <div id="btn-descend">DOWN</div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'https://unpkg.com/three@0.158.0/build/three.module.js';
+
+    class FastNoise {
+      constructor(seed = 12345) {
+        this.p = new Uint8Array(256);
+        for (let i = 0; i < 256; i++) this.p[i] = Math.floor(Math.abs(Math.sin(i + seed)) * 10000) & 255;
+        this.perm = new Uint8Array(512);
+        this.gradP = new Array(512);
+        const grad3 = [[1,1],[-1,1],[1,-1],[-1,-1],[1,0],[-1,0],[0,1],[0,-1]];
+        for (let i = 0; i < 512; i++) {
+          this.perm[i] = this.p[i & 255];
+          this.gradP[i] = grad3[this.perm[i] % 8];
+        }
+      }
+      dot(g, x, y) { return g[0] * x + g[1] * y; }
+      noise2D(xin, yin) {
+        let n0, n1, n2;
+        const F2 = 0.5 * (Math.sqrt(3.0) - 1.0);
+        const s = (xin + yin) * F2;
+        const i = Math.floor(xin + s);
+        const j = Math.floor(yin + s);
+        const G2 = (3.0 - Math.sqrt(3.0)) / 6.0;
+        const t = (i + j) * G2;
+        const X0 = i - t; const Y0 = j - t;
+        const x0 = xin - X0; const y0 = yin - Y0;
+        let i1, j1;
+        if (x0 > y0) { i1 = 1; j1 = 0; } else { i1 = 0; j1 = 1; }
+        const x1 = x0 - i1 + G2; const y1 = y0 - j1 + G2;
+        const x2 = x0 - 1.0 + 2.0 * G2; const y2 = y0 - 1.0 + 2.0 * G2;
+        const ii = i & 255; const jj = j & 255;
+        let t0 = 0.5 - x0 * x0 - y0 * y0;
+        if (t0 < 0) n0 = 0.0; else { t0 *= t0; n0 = t0 * t0 * this.dot(this.gradP[ii + this.perm[jj]], x0, y0); }
+        let t1 = 0.5 - x1 * x1 - y1 * y1;
+        if (t1 < 0) n1 = 0.0; else { t1 *= t1; n1 = t1 * t1 * this.dot(this.gradP[ii + i1 + this.perm[jj + j1]], x1, y1); }
+        let t2 = 0.5 - x2 * x2 - y2 * y2;
+        if (t2 < 0) n2 = 0.0; else { t2 *= t2; n2 = t2 * t2 * this.dot(this.gradP[ii + 1 + this.perm[jj + 1]], x2, y2); }
+        return 70.0 * (n0 + n1 + n2);
+      }
+    }
+
+    let camera, scene, renderer, pitchObject, yawObject;
+    let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false, canJump = false;
+    
+    let isFlying = false; 
+    let lastJumpTapTime = 0; 
+    let isJumpHolding = false; 
+    let isDescendHolding = false;
+    let isRunning = false; 
+    let isInvOpen = false;
+
+    let prevTime = performance.now();
+    const velocity = new THREE.Vector3();
+    const direction = new THREE.Vector3();
+
+    let selectedBlockIndex = 0;
+    let activeSlotElement = null; 
+    
+    const raycaster = new THREE.Raycaster();
+    
+    // 💡 [추가] 청크 시스템 변수
+    const CHUNK_SIZE = 16;
+    const RENDER_DISTANCE = 2; // 내 위치 기준 사방 2청크(5x5 렌더링)
+    let currentChunkX = -999;
+    let currentChunkZ = -999;
+    const activeChunks = new Map(); // 로드된 청크 관리
+    const destroyedTerrain = new Set(); // 파괴된 기본 지형 기억
+    
+    const interactableObjects = [];
+    let selectionOutline; 
+    
+    const centerVector = new THREE.Vector2(0, 0);
+    let currentIntersect = null;
+
+    let isMining = false;
+    let miningTime = 0;
+    const MINE_DURATION = 0.5;
+    let targetBlock = null;
+    let hasInteracted = false;
+    let isDragging = false;
+
+    const playerBox = new THREE.Box3();
+    const tempBox = new THREE.Box3();
+    const pMin = new THREE.Vector3();
+    const pMax = new THREE.Vector3();
+    
+    const boxGeometry = new THREE.BoxGeometry(20, 20, 20);
+    
+    function createTexture(type) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 16; canvas.height = 16;
+      const ctx = canvas.getContext('2d');
+
+      if (type === 'grass_top') {
+        ctx.fillStyle = '#5c9c5c'; ctx.fillRect(0, 0, 16, 16);
+        ctx.fillStyle = '#4c8c4c'; ctx.fillRect(2, 2, 4, 4); ctx.fillRect(10, 8, 4, 4);
+      } else if (type === 'grass_side') {
+        ctx.fillStyle = '#8b5a2b'; ctx.fillRect(0, 0, 16, 16);
+        ctx.fillStyle = '#5c9c5c'; ctx.fillRect(0, 0, 16, 5); 
+        ctx.fillRect(2, 5, 3, 2); ctx.fillRect(10, 5, 4, 3);
+      } else if (type === 'dirt') {
+        ctx.fillStyle = '#8b5a2b'; ctx.fillRect(0, 0, 16, 16);
+        ctx.fillStyle = '#7a4a1b'; ctx.fillRect(3, 3, 4, 4); ctx.fillRect(11, 10, 3, 3);
+      } else if (type === 'stone') {
+        ctx.fillStyle = '#7d7d7d'; ctx.fillRect(0, 0, 16, 16);
+        ctx.fillStyle = '#5d5d5d'; ctx.fillRect(1, 1, 4, 4); ctx.fillRect(9, 10, 5, 3);
+      } else if (type === 'wood') {
+        ctx.fillStyle = '#8b6508'; ctx.fillRect(0, 0, 16, 16);
+        ctx.fillStyle = '#6b4508'; ctx.fillRect(2, 0, 2, 16); ctx.fillRect(8, 0, 3, 16); ctx.fillRect(13, 0, 1, 16);
+      } else if (type === 'brick') {
+        ctx.fillStyle = '#b22222'; ctx.fillRect(0, 0, 16, 16);
+        ctx.fillStyle = '#cccccc'; 
+        ctx.fillRect(0, 7, 16, 2); ctx.fillRect(6, 0, 2, 7); ctx.fillRect(12, 9, 2, 7);
+      } else if (type === 'leaves') {
+        ctx.fillStyle = '#3a7d3a'; ctx.fillRect(0, 0, 16, 16);
+        ctx.fillStyle = '#2d632d'; ctx.fillRect(1, 1, 4, 4); ctx.fillRect(8, 9, 5, 4);
+      } else if (type === 'coal_ore') {
+        ctx.fillStyle = '#7d7d7d'; ctx.fillRect(0, 0, 16, 16);
+        ctx.fillStyle = '#5d5d5d'; ctx.fillRect(1, 1, 4, 4); ctx.fillRect(9, 10, 5, 3);
+        ctx.fillStyle = '#2b2b2b'; ctx.fillRect(3, 4, 2, 2); ctx.fillRect(10, 3, 2, 2); ctx.fillRect(5, 11, 2, 2);
+      } else if (type === 'iron_ore') {
+        ctx.fillStyle = '#7d7d7d'; ctx.fillRect(0, 0, 16, 16);
+        ctx.fillStyle = '#5d5d5d'; ctx.fillRect(1, 1, 4, 4); ctx.fillRect(9, 10, 5, 3);
+        ctx.fillStyle = '#d8af93'; ctx.fillRect(2, 5, 2, 2); ctx.fillRect(11, 4, 2, 2); ctx.fillRect(6, 12, 2, 2);
+      } else if (type === 'gold_ore') {
+        ctx.fillStyle = '#7d7d7d'; ctx.fillRect(0, 0, 16, 16);
+        ctx.fillStyle = '#5d5d5d'; ctx.fillRect(1, 1, 4, 4); ctx.fillRect(9, 10, 5, 3);
+        ctx.fillStyle = '#fcee4b'; ctx.fillRect(4, 3, 2, 2); ctx.fillRect(9, 6, 2, 2); ctx.fillRect(3, 11, 2, 2);
+      } else if (type === 'diamond_ore') {
+        ctx.fillStyle = '#7d7d7d'; ctx.fillRect(0, 0, 16, 16);
+        ctx.fillStyle = '#5d5d5d'; ctx.fillRect(1, 1, 4, 4); ctx.fillRect(9, 10, 5, 3);
+        ctx.fillStyle = '#33ebcb'; ctx.fillRect(5, 5, 2, 2); ctx.fillRect(12, 8, 2, 2); ctx.fillRect(4, 13, 2, 2);
+      }
+      
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.magFilter = THREE.NearestFilter; texture.minFilter = THREE.NearestFilter;
+      return texture;
+    }
+
+    const texGrassTop = createTexture('grass_top');
+    const texGrassSide = createTexture('grass_side');
+    const texDirt = createTexture('dirt');
+    const texStone = createTexture('stone');
+    const texWood = createTexture('wood');
+    const texBrick = createTexture('brick');
+    const texLeaves = createTexture('leaves');
+    const texCoal = createTexture('coal_ore');
+    const texIron = createTexture('iron_ore');
+    const texGold = createTexture('gold_ore');
+    const texDiamond = createTexture('diamond_ore');
+
+    const grassMaterials = [
+      new THREE.MeshLambertMaterial({ map: texGrassSide }),
+      new THREE.MeshLambertMaterial({ map: texGrassSide }),
+      new THREE.MeshLambertMaterial({ map: texGrassTop }),
+      new THREE.MeshLambertMaterial({ map: texDirt }),
+      new THREE.MeshLambertMaterial({ map: texGrassSide }),
+      new THREE.MeshLambertMaterial({ map: texGrassSide })
+    ];
+
+    const leafMaterial = new THREE.MeshLambertMaterial({ map: texLeaves });
+
+    const materials = [
+      grassMaterials, // 0
+      new THREE.MeshLambertMaterial({ map: texDirt }), // 1
+      new THREE.MeshLambertMaterial({ map: texStone }), // 2
+      new THREE.MeshLambertMaterial({ map: texWood }), // 3
+      new THREE.MeshLambertMaterial({ map: texBrick }), // 4
+      new THREE.MeshLambertMaterial({ map: texCoal }), // 5
+      new THREE.MeshLambertMaterial({ map: texIron }), // 6
+      new THREE.MeshLambertMaterial({ map: texGold }), // 7
+      new THREE.MeshLambertMaterial({ map: texDiamond }), // 8
+      leafMaterial // 9
+    ];
+
+    const allBlocksData = [
+      { index: 0, tex: texGrassSide },
+      { index: 1, tex: texDirt },
+      { index: 2, tex: texStone },
+      { index: 3, tex: texWood },
+      { index: 4, tex: texBrick },
+      { index: 5, tex: texCoal },
+      { index: 6, tex: texIron },
+      { index: 7, tex: texGold },
+      { index: 8, tex: texDiamond },
+      { index: 9, tex: texLeaves }
+    ];
+
+    document.getElementById('slot-0').style.backgroundImage = `url(${texGrassSide.image.toDataURL()})`;
+    document.getElementById('slot-1').style.backgroundImage = `url(${texDirt.image.toDataURL()})`;
+    document.getElementById('slot-2').style.backgroundImage = `url(${texStone.image.toDataURL()})`;
+    document.getElementById('slot-3').style.backgroundImage = `url(${texWood.image.toDataURL()})`;
+    document.getElementById('slot-4').style.backgroundImage = `url(${texBrick.image.toDataURL()})`;
+    activeSlotElement = document.getElementById('slot-0');
+
+    // 💡 [추가] 좌표를 기반으로 한 고정된 랜덤 시드 생성 함수 (청크 로딩 시 일관성 유지)
+    function randomSeed(x, y, z) {
+        let n = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719) * 43758.5453;
+        return n - Math.floor(n);
+    }
+    function random2D(x, z) {
+        let n = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453;
+        return n - Math.floor(n);
+    }
+    const noise = new FastNoise(54321);
+
+    init();
+    animate();
+
+    function init() {
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x87CEEB);
+      
+      // 💡 [추가] 렌더링 한계점에서 블록이 자연스럽게 가려지도록 하늘색 안개 설정
+      scene.fog = new THREE.Fog(0x87CEEB, 400, 750);
+
+      const light = new THREE.HemisphereLight(0xeeeeff, 0x777788, 0.85);
+      light.position.set(0.5, 1, 0.75);
+      scene.add(light);
+      
+      const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
+      dirLight.position.set(100, 200, 50);
+      scene.add(dirLight);
+
+      camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 1000);
+      pitchObject = new THREE.Object3D(); pitchObject.add(camera);
+      yawObject = new THREE.Object3D(); yawObject.add(pitchObject);
+      scene.add(yawObject);
+
+      const floorGeometry = new THREE.PlaneGeometry(5000, 5000, 10, 10); // 바닥 크기도 연장
+      floorGeometry.rotateX(-Math.PI / 2);
+      const floor = new THREE.Mesh(floorGeometry, new THREE.MeshBasicMaterial({ visible: false }));
+      floor.name = 'floor';
+      floor.position.y = -500; 
+      scene.add(floor);
+      interactableObjects.push(floor);
+
+      const outlineGeo = new THREE.BoxGeometry(20.1, 20.1, 20.1);
+      const edges = new THREE.EdgesGeometry(outlineGeo);
+      selectionOutline = new THREE.LineSegments(
+        edges, 
+        new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 })
+      );
+      selectionOutline.visible = false;
+      scene.add(selectionOutline);
+
+      renderer = new THREE.WebGLRenderer({ antialias: false });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.body.appendChild(renderer.domElement);
+
+      // 시작 시 플레이어 높이 세팅 (0, 0 좌표 기준 높이 계산)
+      let initH = Math.floor(noise.noise2D(0, 0) * 3 + noise.noise2D(0, 0) * 1.5 + 3);
+      yawObject.position.set(0, initH * 20 + 30, 0);
+
+      setupTouchControls();
+      setupInventory();
+      
+      updateChunks(); // 💡 초기 청크 생성
+    }
+
+    // 💡 [추가] 청크 단위 지형 생성 함수
+    function generateChunk(cx, cz) {
+        const chunkGroup = new THREE.Group();
+        const chunkBlocks = [];
+        const maxDepth = -20;
+
+        for (let lx = 0; lx < CHUNK_SIZE; lx++) {
+            for (let lz = 0; lz < CHUNK_SIZE; lz++) {
+                const worldX = cx * CHUNK_SIZE + lx;
+                const worldZ = cz * CHUNK_SIZE + lz;
+                
+                const nx = worldX * 0.08;
+                const nz = worldZ * 0.08;
+                let h = Math.floor(noise.noise2D(nx, nz) * 3 + noise.noise2D(nx * 2, nz * 2) * 1.5 + 3);
+                if (h < 1) h = 1;
+
+                for (let y = maxDepth; y <= h; y++) {
+                    // 유저가 파괴한 블록이라면 생성 스킵
+                    if (destroyedTerrain.has(`${worldX},${y},${worldZ}`)) continue;
+
+                    let mat;
+                    if (y === h) mat = materials[0];       
+                    else if (y >= h - 2) mat = materials[1]; 
+                    else {
+                      const rand = randomSeed(worldX, y, worldZ);
+                      if (y < -15 && rand < 0.02) mat = materials[8];
+                      else if (y < -8 && rand < 0.04) mat = materials[7];
+                      else if (y < 0 && rand < 0.07) mat = materials[6];
+                      else if (rand < 0.1) mat = materials[5];
+                      else mat = materials[2];
+                    }
+
+                    const box = new THREE.Mesh(boxGeometry, mat);
+                    box.position.set(worldX * 20, y * 20 - 10, worldZ * 20);
+                    box.matrixAutoUpdate = false; 
+                    box.updateMatrix();
+                    chunkGroup.add(box);
+                    chunkBlocks.push(box);
+                }
+
+                // 나무 생성 (고정 좌표계 시드 사용)
+                if (!(worldX === 0 && worldZ === 0) && random2D(worldX, worldZ) < 0.025) {
+                    const treeY = h * 20 - 10;
+                    for (let ty = 1; ty <= 3; ty++) {
+                        const by = h + ty;
+                        if (!destroyedTerrain.has(`${worldX},${by},${worldZ}`)) {
+                            const trunk = new THREE.Mesh(boxGeometry, materials[3]);
+                            trunk.position.set(worldX * 20, treeY + ty * 20, worldZ * 20);
+                            trunk.matrixAutoUpdate = false; trunk.updateMatrix();
+                            chunkGroup.add(trunk); chunkBlocks.push(trunk);
+                        }
+                    }
+                    for (let tlx = -1; tlx <= 1; tlx++) {
+                        for (let tlz = -1; tlz <= 1; tlz++) {
+                            for (let ly = 3; ly <= 4; ly++) {
+                                if (tlx === 0 && tlz === 0 && ly === 3) continue;
+                                const bx = worldX + tlx;
+                                const by = h + ly;
+                                const bz = worldZ + tlz;
+                                if (!destroyedTerrain.has(`${bx},${by},${bz}`)) {
+                                    const leaf = new THREE.Mesh(boxGeometry, leafMaterial);
+                                    leaf.position.set(bx * 20, treeY + ly * 20, bz * 20);
+                                    leaf.matrixAutoUpdate = false; leaf.updateMatrix();
+                                    chunkGroup.add(leaf); chunkBlocks.push(leaf);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        scene.add(chunkGroup);
+        interactableObjects.push(...chunkBlocks);
+        activeChunks.set(`${cx},${cz}`, { group: chunkGroup, blocks: chunkBlocks });
+    }
+
+    // 💡 [추가] 플레이어 이동에 따른 무한 청크 관리
+    function updateChunks() {
+        const cx = Math.floor(yawObject.position.x / (CHUNK_SIZE * 20));
+        const cz = Math.floor(yawObject.position.z / (CHUNK_SIZE * 20));
+
+        if (cx !== currentChunkX || cz !== currentChunkZ) {
+            currentChunkX = cx;
+            currentChunkZ = cz;
+
+            const chunksToKeep = new Set();
+
+            // 플레이어 주변 RENDER_DISTANCE(2) 반경 생성
+            for (let x = -RENDER_DISTANCE; x <= RENDER_DISTANCE; x++) {
+                for (let z = -RENDER_DISTANCE; z <= RENDER_DISTANCE; z++) {
+                    const targetX = cx + x;
+                    const targetZ = cz + z;
+                    const key = `${targetX},${targetZ}`;
+                    chunksToKeep.add(key);
+
+                    if (!activeChunks.has(key)) {
+                        generateChunk(targetX, targetZ);
+                    }
+                }
+            }
+
+            // 시야 밖으로 멀어진 청크 삭제 (메모리 관리 및 렉 방지)
+            for (const [key, chunkData] of activeChunks.entries()) {
+                if (!chunksToKeep.has(key)) {
+                    scene.remove(chunkData.group);
+                    for (let i = 0; i < chunkData.blocks.length; i++) {
+                        const idx = interactableObjects.indexOf(chunkData.blocks[i]);
+                        if (idx > -1) interactableObjects.splice(idx, 1);
+                    }
+                    activeChunks.delete(key);
+                }
+            }
+        }
+    }
+
+    function getCollisions(pos) {
+      pMin.set(pos.x - 4, pos.y - 29.9, pos.z - 4);
+      pMax.set(pos.x + 4, pos.y + 5.9, pos.z + 4);
+      playerBox.set(pMin, pMax);
+      
+      const hits = [];
+      for (let i = 0; i < interactableObjects.length; i++) {
+        const obj = interactableObjects[i];
+        if (obj.name === 'floor') continue; 
+        
+        const dx = Math.abs(obj.position.x - pos.x);
+        const dy = Math.abs(obj.position.y - pos.y);
+        const dz = Math.abs(obj.position.z - pos.z);
+        if (dx > 40 || dy > 50 || dz > 40) continue; 
+        
+        tempBox.setFromObject(obj);
+        if (playerBox.intersectsBox(tempBox)) hits.push(obj);
+      }
+      return hits;
+    }
+
+    function setupInventory() {
+      const invGrid = document.getElementById('inventory-grid');
+      const invModal = document.getElementById('inventory-modal');
+      const btnInventory = document.getElementById('btn-inventory');
+      const btnCloseInv = document.getElementById('btn-close-inv');
+
+      allBlocksData.forEach(block => {
+        const div = document.createElement('div');
+        div.className = 'slot';
+        div.style.backgroundImage = `url(${block.tex.image.toDataURL()})`;
+        
+        div.addEventListener('touchstart', (e) => {
+          e.preventDefault();
+          if (activeSlotElement) {
+            activeSlotElement.style.backgroundImage = div.style.backgroundImage;
+            activeSlotElement.setAttribute('data-index', block.index);
+            selectedBlockIndex = block.index; 
+          }
+          invModal.style.display = 'none';
+          isInvOpen = false;
+        }, { passive: false });
+        
+        invGrid.appendChild(div);
+      });
+
+      btnInventory.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        isInvOpen = !isInvOpen;
+        invModal.style.display = isInvOpen ? 'block' : 'none';
+      }, { passive: false });
+
+      btnCloseInv.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        isInvOpen = false;
+        invModal.style.display = 'none';
+      }, { passive: false });
+    }
+
+    function setupTouchControls() {
+      const slots = document.querySelectorAll('#hotbar .slot');
+      slots.forEach(slot => {
+        slot.addEventListener('touchstart', (e) => {
+          e.preventDefault();
+          slots.forEach(s => s.classList.remove('active'));
+          slot.classList.add('active');
+          activeSlotElement = slot; 
+          selectedBlockIndex = parseInt(slot.getAttribute('data-index'));
+        }, { passive: false });
+      });
+
+      const lookArea = document.getElementById('look-area');
+      let lookTouchId = null; 
+      let startTouch = { x: 0, y: 0 };
+
+      lookArea.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (isInvOpen) return; 
+        if (lookTouchId !== null) return; 
+        
+        const touch = e.changedTouches[0];
+        lookTouchId = touch.identifier;
+
+        isDragging = false; 
+        hasInteracted = false;
+        startTouch.x = touch.pageX; 
+        startTouch.y = touch.pageY;
+        
+        if (currentIntersect && currentIntersect.object.name !== 'floor') {
+          isMining = true;
+          miningTime = 0;
+          targetBlock = currentIntersect.object;
+          document.getElementById('progress-container').style.display = 'block';
+          document.getElementById('progress-bar').style.width = '0%';
+        }
+      }, { passive: false });
+
+      lookArea.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        if (isInvOpen || lookTouchId === null) return;
+
+        let touch = null;
+        for (let i = 0; i < e.changedTouches.length; i++) {
+          if (e.changedTouches[i].identifier === lookTouchId) {
+            touch = e.changedTouches[i];
+            break;
+          }
+        }
+        if (!touch) return;
+
+        const deltaX = touch.pageX - startTouch.x;
+        const deltaY = touch.pageY - startTouch.y;
+        
+        if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) {
+          isDragging = true;
+          isMining = false;
+          document.getElementById('progress-container').style.display = 'none';
+        }
+
+        if (isDragging) {
+          yawObject.rotation.y -= deltaX * 0.005;
+          pitchObject.rotation.x -= deltaY * 0.005;
+          pitchObject.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitchObject.rotation.x));
+          startTouch.x = touch.pageX; 
+          startTouch.y = touch.pageY;
+        }
+      }, { passive: false });
+
+      const handleLookEnd = (e) => {
+        if (lookTouchId === null) return;
+
+        let touch = null;
+        for (let i = 0; i < e.changedTouches.length; i++) {
+          if (e.changedTouches[i].identifier === lookTouchId) {
+            touch = e.changedTouches[i];
+            break;
+          }
+        }
+        if (!touch) return;
+
+        lookTouchId = null; 
+        isMining = false;
+        document.getElementById('progress-container').style.display = 'none';
+
+        if (!isDragging && !hasInteracted && !isInvOpen) {
+          interactWithBlock('build');
+        }
+      };
+
+      lookArea.addEventListener('touchend', handleLookEnd, { passive: false });
+      lookArea.addEventListener('touchcancel', handleLookEnd, { passive: false });
+
+      const bindBtn = (id, down, up) => {
+        const btn = document.getElementById(id);
+        btn.addEventListener('touchstart', (e) => { e.preventDefault(); if(!isInvOpen) down(); }, { passive: false });
+        btn.addEventListener('touchend', (e) => { e.preventDefault(); up(); });
+        btn.addEventListener('touchcancel', (e) => { e.preventDefault(); up(); });
+      };
+      
+      bindBtn('btn-w', () => moveForward = true, () => moveForward = false);
+      bindBtn('btn-s', () => moveBackward = true, () => moveBackward = false);
+      bindBtn('btn-a', () => moveLeft = true, () => moveLeft = false);
+      bindBtn('btn-d', () => moveRight = true, () => moveRight = false);
+
+      const runBtn = document.getElementById('btn-run');
+      runBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (isInvOpen) return;
+        isRunning = !isRunning; 
+        if (isRunning) {
+          runBtn.classList.add('running');
+        } else {
+          runBtn.classList.remove('running');
+        }
+      }, { passive: false });
+
+      const jumpBtn = document.getElementById('btn-jump');
+      const descendBtn = document.getElementById('btn-descend');
+
+      jumpBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (isInvOpen) return;
+        const currentTime = performance.now();
+        const tapInterval = currentTime - lastJumpTapTime;
+
+        if (tapInterval < 300 && tapInterval > 50) {
+          isFlying = !isFlying;
+          velocity.y = 0;
+          lastJumpTapTime = 0;
+          
+          if (isFlying) {
+            jumpBtn.classList.add('flying');
+            descendBtn.style.display = 'block';
+          } else {
+            jumpBtn.classList.remove('flying');
+            descendBtn.style.display = 'none';
+          }
+        } else {
+          lastJumpTapTime = currentTime;
+          isJumpHolding = true;
+
+          if (!isFlying && canJump) {
+            velocity.y = 350;
+            canJump = false;
+          }
+        }
+      }, { passive: false });
+
+      jumpBtn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        isJumpHolding = false;
+      });
+      jumpBtn.addEventListener('touchcancel', (e) => {
+        e.preventDefault();
+        isJumpHolding = false;
+      });
+
+      descendBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if(!isInvOpen) isDescendHolding = true;
+      }, { passive: false });
+
+      descendBtn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        isDescendHolding = false;
+      });
+      descendBtn.addEventListener('touchcancel', (e) => {
+        e.preventDefault();
+        isDescendHolding = false;
+      });
+    }
+
+    function interactWithBlock(action) {
+      if (currentIntersect) {
+        if (action === 'build') {
+          const voxel = new THREE.Mesh(boxGeometry, materials[selectedBlockIndex]);
+          
+          const p = currentIntersect.point.clone().add(currentIntersect.face.normal.clone().multiplyScalar(10));
+          voxel.position.x = Math.round(p.x / 20) * 20;
+          voxel.position.y = Math.round((p.y - 10) / 20) * 20 + 10;
+          voxel.position.z = Math.round(p.z / 20) * 20;
+
+          const isOccupied = interactableObjects.some(obj => 
+            obj.name !== 'floor' &&
+            Math.abs(obj.position.x - voxel.position.x) < 1 &&
+            Math.abs(obj.position.y - voxel.position.y) < 1 &&
+            Math.abs(obj.position.z - voxel.position.z) < 1
+          );
+          if (isOccupied) return;
+
+          tempBox.setFromObject(voxel);
+          pMin.set(yawObject.position.x - 4, yawObject.position.y - 29.9, yawObject.position.z - 4);
+          pMax.set(yawObject.position.x + 4, yawObject.position.y + 5.9, yawObject.position.z + 4);
+          playerBox.set(pMin, pMax);
+          if (playerBox.intersectsBox(tempBox)) return;
+
+          // 💡 플레이어가 직접 지은 블록은 청크 시스템 밖(scene)에 별도로 저장되어 사라지지 않음
+          voxel.isPlayerPlaced = true; 
+          voxel.matrixAutoUpdate = false; 
+          voxel.updateMatrix();
+          scene.add(voxel);
+          interactableObjects.push(voxel);
+        }
+      }
+    }
+
+    function updateSelectionOutline() {
+      if (currentIntersect && currentIntersect.object.name !== 'floor' && !isInvOpen) {
+        selectionOutline.position.copy(currentIntersect.object.position);
+        selectionOutline.visible = true;
+      } else {
+        selectionOutline.visible = false;
+      }
+    }
+
+    function updateRaycast() {
+      if (isInvOpen) {
+        currentIntersect = null;
+        return;
+      }
+      raycaster.setFromCamera(centerVector, camera);
+      const intersects = raycaster.intersectObjects(interactableObjects, false);
+      if (intersects.length > 0 && intersects[0].distance <= 150) {
+        currentIntersect = intersects[0];
+      } else {
+        currentIntersect = null;
+      }
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const delta = (performance.now() - prevTime) / 1000;
+
+      updateChunks(); // 💡 매 프레임 위치를 확인하여 청크 로딩 업데이트
+      updateRaycast(); 
+
+      if (isMining && targetBlock) {
+        if (currentIntersect && currentIntersect.object === targetBlock) {
+          miningTime += delta;
+          let progress = (miningTime / MINE_DURATION) * 100;
+
+          if (progress >= 100) {
+            // 💡 [추가] 블록 파괴 시 플레이어가 지은 건지, 지형인지 구분
+            if (targetBlock.isPlayerPlaced) {
+                scene.remove(targetBlock);
+            } else {
+                if (targetBlock.parent) targetBlock.parent.remove(targetBlock);
+                const bx = Math.round(targetBlock.position.x / 20);
+                const by = Math.round((targetBlock.position.y + 10) / 20);
+                const bz = Math.round(targetBlock.position.z / 20);
+                destroyedTerrain.add(`${bx},${by},${bz}`);
+            }
+            interactableObjects.splice(interactableObjects.indexOf(targetBlock), 1);
+            
+            isMining = false;
+            hasInteracted = true; 
+            document.getElementById('progress-container').style.display = 'none';
+          } else {
+            document.getElementById('progress-bar').style.width = Math.min(progress, 100) + '%';
+          }
+        } else {
+          isMining = false;
+          document.getElementById('progress-container').style.display = 'none';
+        }
+      }
+
+      velocity.x -= velocity.x * 10.0 * delta;
+      velocity.z -= velocity.z * 10.0 * delta;
+
+      if (isFlying) {
+        if (isJumpHolding) {
+          velocity.y = 250.0;
+        } else if (isDescendHolding) {
+          velocity.y = -250.0;
+        } else {
+          velocity.y -= velocity.y * 10.0 * delta;
+        }
+      } else {
+        velocity.y -= 9.8 * 100.0 * delta;
+      }
+
+      direction.z = Number(moveForward) - Number(moveBackward);
+      direction.x = Number(moveRight) - Number(moveLeft);
+      direction.normalize(); 
+
+      const currentSpeed = isRunning ? 1200.0 : 600.0; 
+
+      if (moveForward || moveBackward) velocity.z += direction.z * currentSpeed * delta;
+      if (moveLeft || moveRight) velocity.x += direction.x * currentSpeed * delta;
+
+      let onGround = false;
+      yawObject.position.y += velocity.y * delta;
+      let hitsY = getCollisions(yawObject.position);
+      
+      if (hitsY.length > 0) {
+        tempBox.setFromObject(hitsY[0]);
+        if (velocity.y < 0) { 
+          yawObject.position.y = tempBox.max.y + 30; velocity.y = 0; onGround = true; 
+        } else if (velocity.y > 0) { 
+          yawObject.position.y = tempBox.min.y - 6; velocity.y = 0; 
+        }
+      }
+
+      if (yawObject.position.y <= -450) { yawObject.position.y = -450; velocity.y = 0; onGround = true; }
+      canJump = onGround;
+
+      const oldX = yawObject.position.x;
+      const oldZ = yawObject.position.z;
+
+      yawObject.translateZ(-velocity.z * delta);
+      yawObject.translateX(velocity.x * delta);
+      const targetX = yawObject.position.x;
+      const targetZ = yawObject.position.z;
+
+      yawObject.position.x = oldX; yawObject.position.z = oldZ;
+
+      yawObject.position.x = targetX;
+      if (getCollisions(yawObject.position).length > 0) { yawObject.position.x = oldX; velocity.x = 0; }
+
+      yawObject.position.z = targetZ;
+      if (getCollisions(yawObject.position).length > 0) { yawObject.position.z = oldZ; velocity.z = 0; }
+
+      updateSelectionOutline();
+
+      prevTime = performance.now();
+      renderer.render(scene, camera);
+    }
+  </script>
+</body>
+</html>
